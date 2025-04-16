@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import PageContainer from '@/components/PageContainer';
 import { Send, User, Bot } from 'lucide-react';
@@ -107,7 +108,7 @@ export default function ChatPage() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={flex mb-4 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}}
+                className={`flex mb-4 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
                   className={`max-w-[80%] rounded-2xl px-4 py-3 ${
