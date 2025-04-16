@@ -4,7 +4,8 @@ import { Send, User, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { callGeminiAPI } from '@/lib/gemini';
+import axios from 'axios';
+
 type Message = {
   id: string;
   content: string;
@@ -47,11 +48,18 @@ export default function ChatPage() {
     setInput('');
     setLoading(true);
 
+    const API_KEY = "AIzaSyBj1BzzNCg6FOUeic8DTtU3uYNVMaDErQw"; // API key directly here
+
     try {
-      const response = await callGeminiAPI(userMessage.content);
+      const response = await axios.post('https://api.gemini.com/v1/chat', {
+        apiKey: API_KEY,
+        inputMessage: input,
+        chatHistory: messages.map((msg) => msg.content),
+      });
+
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response,
+        content: response.data.reply,
         sender: 'bot',
         timestamp: new Date(),
       };
