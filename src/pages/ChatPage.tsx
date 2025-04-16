@@ -1,7 +1,6 @@
-
 import { useState, useRef, useEffect } from 'react';
 import PageContainer from '@/components/PageContainer';
-import { Send, User, Bot } from 'lucide-react';
+import { Send, User, Bot, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -12,6 +11,7 @@ type Message = {
   content: string;
   sender: 'user' | 'bot';
   timestamp: Date;
+  isError?: boolean;
 };
 
 export default function ChatPage() {
@@ -50,13 +50,16 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      // Call your backend API instead of directly calling Gemini
+      // Prepare chat history in the proper format
+      const chatHistory = messages.map((msg) => ({
+        content: msg.content,
+        role: msg.sender === 'user' ? 'user' : 'assistant'
+      }));
+
+      // Call your backend API
       const response = await axios.post('/api/chat', {
         message: input,
-        chatHistory: messages.map((msg) => ({
-          content: msg.content,
-          role: msg.sender === 'user' ? 'user' : 'assistant'
-        })),
+        chatHistory,
       });
 
       const botMessage: Message = {
@@ -70,9 +73,11 @@ export default function ChatPage() {
       console.error('Chat API error:', err);
       let errorMessage = "There was an error connecting to the AI service.";
       
-      // Check if the error response contains a message about content filtering
-      if (axios.isAxiosError(err) && err.response?.data?.error?.includes('content')) {
-        errorMessage = "I'm unable to respond to that message due to content policy restrictions.";
+      // Check for specific error messages
+      if (axios.isAxiosError(err)) {
+        if (err.response?.data?.error) {
+          errorMessage = err.response.data.error;
+        }
       }
       
       setMessages((prev) => [...prev, {
@@ -80,6 +85,7 @@ export default function ChatPage() {
         content: errorMessage,
         sender: 'bot',
         timestamp: new Date(),
+        isError: true
       }]);
     }
 
@@ -114,6 +120,8 @@ export default function ChatPage() {
                   className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                     message.sender === 'user'
                       ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                      : message.isError
+                      ? 'bg-red-50 border border-red-200'
                       : 'bg-white/90 border border-muted'
                   }`}
                 >
@@ -122,11 +130,15 @@ export default function ChatPage() {
                       className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 ${
                         message.sender === 'user'
                           ? 'bg-white/20'
+                          : message.isError
+                          ? 'bg-red-100'
                           : 'bg-blue-100'
                       }`}
                     >
                       {message.sender === 'user' ? (
                         <User className="h-3 w-3 text-white" />
+                      ) : message.isError ? (
+                        <AlertTriangle className="h-3 w-3 text-red-600" />
                       ) : (
                         <Bot className="h-3 w-3 text-blue-600" />
                       )}
@@ -135,7 +147,7 @@ export default function ChatPage() {
                       {message.sender === 'user' ? 'You' : 'Assistant'}
                     </span>
                   </div>
-                  <p>{message.content}</p>
+                  <p className={message.isError ? 'text-red-600' : ''}>{message.content}</p>
                 </div>
               </div>
             ))}
