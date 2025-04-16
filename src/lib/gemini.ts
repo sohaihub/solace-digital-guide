@@ -2,8 +2,8 @@
 // Handle Gemini API requests
 export async function sendChatRequest(message: string, chatHistory: { content: string; role: "user" | "assistant" }[]) {
   try {
-    // API key directly in code (not recommended for production)
-    const API_KEY = "AIzaSyBj1BzzNCg6FOUeic8DTtU3uYNVMaDErQw";
+    // Get API key from environment variable or use the one from .env file
+    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyBj1BzzNCg6FOUeic8DTtU3uYNVMaDErQw";
     
     // Create a structured prompt that includes all context and history
     const structuredPrompt = `
@@ -19,10 +19,10 @@ ${message}
 YOUR RESPONSE (be specific, relevant, and compassionate):
 `;
 
-    console.log("Sending structured prompt to Gemini");
+    console.log("Sending request to Gemini 1.5 Flash");
 
     const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
       {
         method: 'POST',
         headers: {

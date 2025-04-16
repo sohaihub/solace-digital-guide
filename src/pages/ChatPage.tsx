@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import PageContainer from '@/components/PageContainer';
 import { Send, User, Bot, AlertTriangle } from 'lucide-react';
@@ -5,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { sendChatRequest } from '@/lib/gemini';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type Message = {
   id: string;
@@ -26,6 +28,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -89,24 +92,24 @@ export default function ChatPage() {
 
   return (
     <PageContainer>
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">AI Chat Assistant</h1>
-          <p className="text-gray-600">
+      <div className={`${isMobile ? 'w-full' : 'max-w-4xl'} mx-auto`}>
+        <div className="text-center mb-4 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">AI Chat Assistant</h1>
+          <p className="text-sm md:text-base text-gray-600">
             Share your thoughts with our AI assistant.
             All conversations are private and confidential.
           </p>
         </div>
 
         <Card className="glass-card overflow-hidden flex flex-col h-[70vh]">
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-3 md:p-4">
             {messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex mb-4 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                  className={`max-w-[85%] md:max-w-[80%] rounded-2xl px-3 py-2 md:px-4 md:py-3 ${
                     message.sender === 'user'
                       ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
                       : message.isError
@@ -116,7 +119,7 @@ export default function ChatPage() {
                 >
                   <div className="flex items-center mb-1">
                     <div
-                      className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 ${
+                      className={`w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center mr-2 ${
                         message.sender === 'user'
                           ? 'bg-white/20'
                           : message.isError
@@ -136,34 +139,37 @@ export default function ChatPage() {
                       {message.sender === 'user' ? 'You' : 'Assistant'}
                     </span>
                   </div>
-                  <p className={message.isError ? 'text-red-600' : ''}>{message.content}</p>
+                  <p className={`text-sm md:text-base ${message.isError ? 'text-red-600' : ''}`}>
+                    {message.content}
+                  </p>
                 </div>
               </div>
             ))}
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="border-t border-muted p-4 bg-white/50">
+          <div className="border-t border-muted p-3 md:p-4 bg-white/50">
             <div className="flex gap-2">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Type your message..."
-                className="input-styled flex-1"
+                className="input-styled flex-1 text-sm md:text-base"
               />
               <Button
                 onClick={handleSend}
                 disabled={!input.trim() || loading}
                 className="btn-primary"
+                size={isMobile ? "sm" : "default"}
               >
-                {loading ? '...' : <Send className="h-5 w-5" />}
+                {loading ? '...' : <Send className={`h-4 w-4 md:h-5 md:w-5`} />}
               </Button>
             </div>
           </div>
         </Card>
 
-        <div className="mt-6 text-center text-sm text-gray-500">
+        <div className="mt-4 md:mt-6 text-center text-xs md:text-sm text-gray-500">
           <p>
             Note: This is an AI assistant designed to provide general support, but it is not a replacement for
             professional advice. If you're experiencing a crisis,
