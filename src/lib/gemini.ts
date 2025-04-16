@@ -1,15 +1,14 @@
-export const callGeminiAPI = async (chatHistory: ChatPart[]) => {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: chatHistory.map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.text }]
-      }))
-    }),
-  });
+// lib/gemini.ts
+import axios from 'axios';
 
-  const data = await res.json();
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't respond right now.";
+export const callGeminiAPI = async (inputMessage: string) => {
+  try {
+    const response = await axios.post('https://api.gemini.com/v1/chat', {
+      apiKey: 'AIzaSyBj1BzzNCg6FOUeic8DTtU3uYNVMaDErQw',
+      inputMessage,
+    });
+    return response.data.reply;
+  } catch (error) {
+    throw new Error('Error calling Gemini API');
+  }
 };
