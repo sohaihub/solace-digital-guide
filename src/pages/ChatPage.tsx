@@ -4,7 +4,7 @@ import { Send, User, Bot, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import axios from 'axios';
+import { sendChatRequest } from '@/lib/gemini';
 
 type Message = {
   id: string;
@@ -53,36 +53,25 @@ export default function ChatPage() {
       // Prepare chat history in the proper format
       const chatHistory = messages.map((msg) => ({
         content: msg.content,
-        role: msg.sender === 'user' ? 'user' : 'assistant'
+        role: msg.sender === 'user' ? 'user' as const : 'assistant' as const
       }));
 
-      // Call your backend API
-      const response = await axios.post('/api/chat', {
-        message: input,
-        chatHistory,
-      });
+      // Call the API
+      const response = await sendChatRequest(input, chatHistory);
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response.data.reply || response.data.message,
+        content: response.reply,
         sender: 'bot',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botMessage]);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Chat API error:', err);
-      let errorMessage = "There was an error connecting to the AI service.";
-      
-      // Check for specific error messages
-      if (axios.isAxiosError(err)) {
-        if (err.response?.data?.error) {
-          errorMessage = err.response.data.error;
-        }
-      }
       
       setMessages((prev) => [...prev, {
         id: (Date.now() + 2).toString(),
-        content: errorMessage,
+        content: err.message || "There was an error connecting to the AI service.",
         sender: 'bot',
         timestamp: new Date(),
         isError: true
