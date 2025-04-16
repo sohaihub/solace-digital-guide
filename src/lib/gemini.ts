@@ -1,5 +1,4 @@
-// File: pages/api/chat.ts or app/api/chat/route.ts (depending on your Next.js version)
-
+// File: pages/api/chat.ts or app/api/chat/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
@@ -18,21 +17,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Format messages for the Gemini API
-    // This format may vary depending on the specific Gemini API version you're using
+    // Format the chat history properly for Gemini
+    const formattedHistory = chatHistory.map((msg: any) => ({
+      role: msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.content }]
+    }));
+
+    // Create a system prompt to guide Gemini's responses
+    const systemPrompt = {
+      role: 'system',
+      parts: [{ text: `You are a helpful, empathetic AI assistant. Respond to the user's message in a supportive and relevant way. If the user shares feelings or concerns, acknowledge them specifically and provide thoughtful responses.` }]
+    };
+
+    // Add the current message
+    const currentMessage = {
+      role: 'user',
+      parts: [{ text: message }]
+    };
+
+    // Combine all messages
+    const contents = [
+      systemPrompt,
+      ...formattedHistory,
+      currentMessage
+    ];
+
     const response = await axios.post(
       'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
       {
-        contents: [
-          ...chatHistory.map((msg: any) => ({
-            role: msg.role,
-            parts: [{ text: msg.content }]
-          })),
-          {
-            role: 'user',
-            parts: [{ text: message }]
-          }
-        ],
+        contents,
         generationConfig: {
           temperature: 0.7,
           topK: 40,
@@ -53,10 +66,9 @@ export async function POST(request: NextRequest) {
         }
       }
     );
-
+    
     // Extract the response text
     const reply = response.data.candidates[0].content.parts[0].text;
-
     return NextResponse.json({ reply });
   } catch (error: any) {
     console.error('Error calling Gemini API:', error.response?.data || error);
@@ -69,36 +81,11 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Return more specific error messages
+    const errorMessage = error.response?.data?.error?.message || 'Failed to process message';
     return NextResponse.json(
-      { error: 'Failed to process message' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
 }
-
-// For Next.js Pages Router
-/*
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  try {
-    const { message, chatHistory } = req.body;
-    
-    // Get API key from environment variable
-    const API_KEY = process.env.GEMINI_API_KEY;
-    
-    if (!API_KEY) {
-      return res.status(500).json({ error: 'API key not configured' });
-    }
-
-    // ... same implementation as above ...
-
-    return res.status(200).json({ reply });
-  } catch (error) {
-    // ... same error handling as above ...
-    return res.status(500).json({ error: 'Failed to process message' });
-  }
-}
-*/
