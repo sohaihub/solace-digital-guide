@@ -18,6 +18,7 @@ import {
   Music,
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/components/ui/use-toast';
 
 // Meditation tracks data with audio URLs
 const tracks = [
@@ -109,9 +110,12 @@ export default function MeditationPage() {
   const [currentTrack, setCurrentTrack] = useState(tracks[0]);
   const [volume, setVolume] = useState([70]);
   const [progress, setProgress] = useState(0);
+  const [trackDuration, setTrackDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const progressInterval = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isMobile = useIsMobile();
+  const { toast } = useToast();
   
   // Filter tracks based on selected category
   const filteredTracks = selectedCategory === 'all'
@@ -120,13 +124,40 @@ export default function MeditationPage() {
 
   // Initialize audio element
   useEffect(() => {
-    audioRef.current = new Audio(currentTrack.audioUrl);
-    audioRef.current.volume = volume[0] / 100;
+    // Create audio element if it doesn't exist
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      
+      // Add event listeners
+      audioRef.current.addEventListener('loadedmetadata', () => {
+        if (audioRef.current) {
+          setTrackDuration(audioRef.current.duration);
+        }
+      });
+      
+      audioRef.current.addEventListener('timeupdate', () => {
+        if (audioRef.current) {
+          setCurrentTime(audioRef.current.currentTime);
+          const calculatedProgress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+          setProgress(isNaN(calculatedProgress) ? 0 : calculatedProgress);
+        }
+      });
+      
+      audioRef.current.addEventListener('ended', nextTrack);
+      
+      // Set initial source and volume
+      audioRef.current.src = currentTrack.audioUrl;
+      audioRef.current.volume = volume[0] / 100;
+      audioRef.current.load();
+    }
     
     // Clean up function
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.removeEventListener('loadedmetadata', () => {});
+        audioRef.current.removeEventListener('timeupdate', () => {});
+        audioRef.current.removeEventListener('ended', nextTrack);
         audioRef.current = null;
       }
       if (progressInterval.current) {
@@ -138,14 +169,34 @@ export default function MeditationPage() {
   // Update audio when track changes
   useEffect(() => {
     if (audioRef.current) {
+      // Reset progress
+      setProgress(0);
+      setCurrentTime(0);
+      
+      // Update source and load new track
       audioRef.current.src = currentTrack.audioUrl;
+      audioRef.current.load();
       audioRef.current.volume = volume[0] / 100;
       
+      // Play if was playing before track change
       if (isPlaying) {
-        audioRef.current.play().catch(err => {
-          console.error("Error playing audio:", err);
-          setIsPlaying(false);
-        });
+        const playPromise = audioRef.current.play();
+        
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              // Playback started successfully
+            })
+            .catch(err => {
+              console.error("Error playing audio:", err);
+              setIsPlaying(false);
+              toast({
+                title: "Playback Error",
+                description: "There was an error playing this track. Please try again.",
+                variant: "destructive",
+              });
+            });
+        }
       }
     }
   }, [currentTrack]);
@@ -161,45 +212,57 @@ export default function MeditationPage() {
   const togglePlayPause = () => {
     if (!audioRef.current) return;
     
-    setIsPlaying(!isPlaying);
-    
     if (isPlaying) {
       audioRef.current.pause();
-      if (progressInterval.current) {
-        clearInterval(progressInterval.current);
-        progressInterval.current = null;
-      }
+      setIsPlaying(false);
     } else {
-      audioRef.current.play().catch(err => {
-        console.error("Error playing audio:", err);
-      });
+      const playPromise = audioRef.current.play();
       
-      // Update progress
-      progressInterval.current = window.setInterval(() => {
-        if (audioRef.current) {
-          const calculatedProgress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-          setProgress(calculatedProgress || 0);
-          
-          if (audioRef.current.ended) {
-            nextTrack();
-          }
-        }
-      }, 100);
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch(err => {
+            console.error("Error playing audio:", err);
+            setIsPlaying(false);
+            toast({
+              title: "Playback Error",
+              description: "There was an error playing this track. Please try again.",
+              variant: "destructive",
+            });
+          });
+      }
     }
   };
 
   // Handle track selection
   const selectTrack = (track: typeof tracks[0]) => {
     setCurrentTrack(track);
-    setProgress(0);
     setIsPlaying(true);
     
     if (audioRef.current) {
+      // Update UI immediately while audio loads
+      setProgress(0);
+      setCurrentTime(0);
+      
       audioRef.current.src = track.audioUrl;
-      audioRef.current.play().catch(err => {
-        console.error("Error playing audio:", err);
-        setIsPlaying(false);
-      });
+      audioRef.current.load();
+      
+      const playPromise = audioRef.current.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .catch(err => {
+            console.error("Error playing audio:", err);
+            setIsPlaying(false);
+            toast({
+              title: "Playback Error",
+              description: "There was an error playing this track. Please try again.",
+              variant: "destructive",
+            });
+          });
+      }
     }
   };
 
@@ -217,28 +280,21 @@ export default function MeditationPage() {
     selectTrack(tracks[nextIndex]);
   };
 
-  // Format time from progress percentage and audio duration
-  const formatTime = (progress: number) => {
-    if (!audioRef.current || isNaN(audioRef.current.duration)) {
-      return "0:00";
-    }
-    
-    const totalSeconds = audioRef.current.duration;
-    const currentSeconds = (progress / 100) * totalSeconds;
-    const mins = Math.floor(currentSeconds / 60);
-    const secs = Math.floor(currentSeconds % 60);
+  // Format time from seconds
+  const formatTime = (timeInSeconds: number) => {
+    if (isNaN(timeInSeconds)) return "0:00";
+    const mins = Math.floor(timeInSeconds / 60);
+    const secs = Math.floor(timeInSeconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  // Format duration
-  const formatDuration = () => {
-    if (!audioRef.current || isNaN(audioRef.current.duration)) {
-      return currentTrack.duration;
-    }
+  // Handle seeking in the track
+  const handleSeek = (newProgress: number[]) => {
+    if (!audioRef.current || isNaN(audioRef.current.duration)) return;
     
-    const mins = Math.floor(audioRef.current.duration / 60);
-    const secs = Math.floor(audioRef.current.duration % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    const seekTime = (newProgress[0] / 100) * audioRef.current.duration;
+    audioRef.current.currentTime = seekTime;
+    setProgress(newProgress[0]);
   };
 
   return (
@@ -312,15 +368,16 @@ export default function MeditationPage() {
 
               {/* Progress Bar */}
               <div className="mb-4">
-                <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-mindful-400 to-mindful-600 rounded-full"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+                <Slider 
+                  value={[progress]} 
+                  onValueChange={handleSeek}
+                  max={100}
+                  step={1}
+                  className="mb-1"
+                />
                 <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>{formatTime(progress)}</span>
-                  <span>{formatDuration()}</span>
+                  <span>{formatTime(currentTime)}</span>
+                  <span>{formatTime(trackDuration)}</span>
                 </div>
               </div>
 
