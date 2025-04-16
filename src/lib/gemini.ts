@@ -7,47 +7,35 @@ export async function POST(request: NextRequest) {
   try {
     const { message, chatHistory } = await request.json();
     
-    // Get API key from environment variable
-    const API_KEY = process.env.GEMINI_API_KEY;
+    // API key directly in code (not recommended for production)
+    const API_KEY = "AIzaSyBj1BzzNCg6FOUeic8DTtU3uYNVMaDErQw";
     
-    if (!API_KEY) {
-      return NextResponse.json(
-        { error: 'API key not configured' },
-        { status: 500 }
-      );
-    }
+    // Create a structured prompt that includes all context and history
+    const structuredPrompt = `
+CONTEXT:
+You are Solace, an AI therapy assistant. Be empathetic, supportive and always respond directly to what the user has shared. Keep responses concise (2-3 sentences) and focused on the user's specific emotions and concerns.
 
-    // Format the chat history properly for Gemini
-    const formattedHistory = chatHistory.map((msg: any) => ({
-      role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }]
-    }));
+PREVIOUS CONVERSATION:
+${chatHistory.map(msg => `${msg.role === 'user' ? 'User' : 'Solace'}: ${msg.content}`).join('\n')}
 
-    // Create a system prompt to guide Gemini's responses
-    const systemPrompt = {
-      role: 'system',
-      parts: [{ text: `You are a helpful, empathetic AI assistant. Respond to the user's message in a supportive and relevant way. If the user shares feelings or concerns, acknowledge them specifically and provide thoughtful responses.` }]
-    };
+USER'S LATEST MESSAGE:
+${message}
 
-    // Add the current message
-    const currentMessage = {
-      role: 'user',
-      parts: [{ text: message }]
-    };
+YOUR RESPONSE (be specific, relevant, and compassionate):
+`;
 
-    // Combine all messages
-    const contents = [
-      systemPrompt,
-      ...formattedHistory,
-      currentMessage
-    ];
+    console.log("Sending structured prompt to Gemini");
 
     const response = await axios.post(
       'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
       {
-        contents,
+        contents: [
+          {
+            parts: [{ text: structuredPrompt }]
+          }
+        ],
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.4,
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 1024,
@@ -69,7 +57,11 @@ export async function POST(request: NextRequest) {
     
     // Extract the response text
     const reply = response.data.candidates[0].content.parts[0].text;
-    return NextResponse.json({ reply });
+    
+    // Clean up the response to remove any prefixes like "YOUR RESPONSE:" that might be echoed back
+    const cleanedReply = reply.replace(/^(YOUR RESPONSE|Solace|AI|Assistant):\s*/i, '');
+    
+    return NextResponse.json({ reply: cleanedReply });
   } catch (error: any) {
     console.error('Error calling Gemini API:', error.response?.data || error);
     
